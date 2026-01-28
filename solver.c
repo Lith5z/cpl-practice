@@ -6,7 +6,7 @@
 
 #define ACCURACY 0.0001
 
-enum MODE{
+enum MODE {
     CRAMER_MODE = 1, GAUSSIAN_MODE, DET_MODE, RANK_MODE
 };
 
@@ -27,7 +27,7 @@ int is_equal(double num,double target) {
 int is_homogeneous(double **A) {
     int flag = 1;
     for (int i=0; i < n; i++) {
-        if (!is_equal(A[i][m],0)) {
+        if (!is_equal(A[i][m-1],0)) {
             flag = 0;
             break;
         }
@@ -42,6 +42,7 @@ void row_divide(double *row,double divisor,int start);
 
 void show(double **matrix);
 double** init_matrix(void);
+double** init_vec(int nums);
 void matrix_copy(double **org,double **dst);
 
 //det函数会破坏原矩阵，请带入副本
@@ -99,14 +100,12 @@ void cramer_solve(double **A,double *res) {
         free(replaceA);
     }
 }
-//将增广矩阵化为行简化 同时维护两个rank，会修改带入的矩阵
+//将增广矩阵化为行简化 同时维护增广矩阵的rank，会修改带入的矩阵
 void row_simplify(double **A) {
     //下面一行行的简化，i_cur和j_cur代表非零元的位置
     if (debug_mode) show(A);
     int i_cur = 0,j_cur = 0;
     while (i_cur < n && j_cur < m) {
-        //增广矩阵 m 至少为 2
-        if (j_cur == m - 2) coeff_rank = i_cur;
         if (is_equal(A[i_cur][j_cur],0.0)) {
             int has_swap = 0;
             for (int i=i_cur+1; i < n; i++) {
@@ -137,23 +136,142 @@ void row_simplify(double **A) {
         i_cur++;
         j_cur++;
     }
-    if (j_cur < m) coeff_rank = i_cur;
     extend_rank = i_cur;
 }
-void gaussian_solve(double **A) {
+//遍历行简化矩阵，维护基础解系的列所在位置pos_arr和解系个数，并且得到系数矩阵的rank
+void get_zero(double **A,int **pos_arr) {
+    int i_cur = 0, j_cur = 0;
+    int temp = 0;
+    //增广矩阵 m 至少为 2
+    while (i_cur < n && j_cur < m - 1) {
+        if (is_equal(A[i_cur][j_cur],0)) {
+            pos_arr[temp][0] = i_cur;
+            pos_arr[temp][1] = j_cur;
+            temp++;
+            j_cur++;
+        }
+        else {
+            i_cur++;
+            j_cur++;
+        }
+    }
+    coeff_rank = i_cur;
+}
+//根据坐标，得基础解系向量vec具体的值；注意坐标的i必然是不减的
+void vec_solve(double **A,double **vec,int **pos_arr,int num) {
+    //index 既对应解系向量，又对应pos_arr
+    for (int index=0; index < num; index++) {
+        int temp = 0;
+        for (int p_in=0, p_read=0; p_in < n; p_in++) {
+            if (p_in == pos_arr[index][0]) {
+                vec[index][p_in] = 1;
+                for (int j=index+1; j < num; j++) pos_arr[j][0]++;
+                break;
+            }
+
+            if (p_read == pos_arr[temp][0]) {
+                temp++;
+                vec[index][p_in] = 0;
+            }
+            else {
+                vec[index][p_in] = A[p_read][pos_arr[index][1]] * (-1);
+                p_read++;
+            }
+        }
+    }
+}
+//输出部分也在该函数完成
+void gaussian_solve(double **A,int **pos_arr) {
     int is_homogen = is_homogeneous(A);
     row_simplify(A);
+    get_zero(A,pos_arr);
+    int solutions_num = m - 1 - coeff_rank;
 
     if (is_homogen) {
+        //列满秩则只有零解
+        if (coeff_rank == m - 1) {
+            printf("\n该齐次线性方程组列满秩，只有零解！\n");
+            return;
+        }
 
+        //列不满秩有无数解，解的形式为基础解系的线性组合
+        double **vecs = init_vec(solutions_num);
+        vec_solve(A,vecs,pos_arr,solutions_num);
+
+        printf("\n该齐次线性方程组列不满秩，有无数解，下面为该方程组的通解：\n");
+        for (int i=0; i < solutions_num; i++) {
+            printf("k_%d(",i+1);
+            for (int j=0; j < m - 1; j++) {
+                if (j != m - 2) printf("%lf, ",vecs[i][j]);
+                else printf("%lf)^T",vecs[i][j]);
+            }
+            if (i != solutions_num - 1) printf(" +\n");
+            else printf(".\n其中 k_i 为任意实数\n");
+        }
     }
     else {
+        //判断可解性
+        if (coeff_rank < extend_rank) {
+            printf("\n系数矩阵的秩小于增广矩阵的秩，方程组无解！\n");
+            return;
+        }
 
+        //列满秩，只有唯一解
+        if (coeff_rank == m - 1) {
+            printf("\n该齐次线性方程组列满秩，只有一个解：\n");
+            printf("(");
+            for (int i=0; i < n; i++) {
+                if (i != n - 1) printf("%lf, ",A[i][m-1]);
+                else printf("%lf)^T",A[i][m-1]);
+            }
+            printf(".\n");
+            return;
+        }
+
+        //列不满秩，解的形式为特解+对应齐次基础解系
+        //解决t特解向量
+        double *spec_vec = calloc(n,sizeof(double));
+        if (spec_vec == NULL) {
+            printf("\n内存分配失败！\n");
+            system("pause");
+            exit(0);
+        }
+        for (int p_in=0,temp=0,p_read; p_in < n; p_in++) {
+            if (p_in == pos_arr[temp][0] + temp) {
+                temp++;
+                spec_vec[p_in] = 0;
+            }
+            else {
+                spec_vec[p_in] = A[p_read][m-1];
+                p_read++;
+            }
+        }
+        
+        double **vecs = init_vec(solutions_num);
+        vec_solve(A,vecs,pos_arr,solutions_num);
+
+        //输出
+        printf("\n为该方程组通解为：\n");
+        printf("(");
+        for (int j=0; j < n; j++) {
+            if (j != n - 1) printf("%lf, ",spec_vec[j]);
+            else printf("%lf)^T",spec_vec[j]);
+        }
+        printf(" +\n");
+        for (int i=0; i < solutions_num; i++) {
+            printf("k_%d(",i+1);
+            for (int j=0; j < m - 1; j++) {
+                if (j != m - 2) printf("%lf, ",vecs[i][j]);
+                else printf("%lf)^T",vecs[i][j]);
+            }
+            if (i != solutions_num - 1) printf(" +\n");
+            else printf(".\n其中 k_i 为任意实数\n");
+        }
     }
 }
 
 int main() {
-    //freopen("input.txt","r",stdin);
+    freopen("input.txt","r",stdin);
     int temp;
     printf("本计算器适用于 1.求解线性方程组Ax = b 2.计算方阵的行列式 3.将矩阵化为行简化阶梯型并求矩阵的秩 \n此外，本计算器的精度为 0.0001 ，如果数值过小，结果可能是错误的！\n如果你已经知晓以上内容，请输入 1 ：");
     scanf("%d",&temp);
@@ -261,8 +379,22 @@ int main() {
             break;
         }
         case GAUSSIAN_MODE: {
-            gaussian_solve(matrix);
-            show(matrix);
+            //数组的值代表解系零元的坐标
+            int **zero_pos = calloc(n,sizeof(int*));
+            if (zero_pos == NULL) {
+                printf("\n内存分配失败！\n");
+                system("pause");
+                exit(0);
+            }
+            for (int i=0; i < n; i++) {
+                zero_pos[i] = calloc(2,sizeof(int));
+                if (zero_pos[i] == NULL) {
+                    printf("\n内存分配失败！\n");
+                    system("pause");
+                    exit(0);
+                }
+            }
+            gaussian_solve(matrix,zero_pos);
             break;
         }
         case DET_MODE: {
@@ -272,7 +404,7 @@ int main() {
         case RANK_MODE: {
             row_simplify(matrix);
             show(matrix);
-            printf("该矩阵的秩为%d %d\n",coeff_rank,extend_rank);
+            printf("该矩阵的秩为%d\n",extend_rank);
             break;
         }
         default: {
@@ -283,7 +415,7 @@ int main() {
         }
     }
 
-    free(matrix);
+    //free(matrix);
     system("pause");
     return 0;
 }
@@ -316,6 +448,23 @@ double** init_matrix(void) {
         }
     }
     return matrix;
+}
+double** init_vec(int nums) {
+    double **vec = malloc(nums * sizeof(double*));
+    if (vec == NULL) {
+        printf("\n内存分配失败！\n");
+        system("pause");
+        exit(0);
+    }
+    for (int i=0; i < nums; i++) {
+        vec[i] = calloc(m-1,sizeof(double));
+        if (vec[i] == NULL) {
+            printf("\n内存分配失败！\n");
+            system("pause");
+            exit(0);
+        }
+    }
+    return vec;
 }
 void matrix_copy(double **org,double **dst) {
     for (int i=0; i < n; i++) {
