@@ -87,8 +87,7 @@ void cramer_solve(double **A,double *res) {
     free(tempA);
     if (is_equal(detAb,0)) {
         printf("\n系数矩阵的行列式为0，克莱姆法则无法判断解的情况！\n");
-        system("pause");
-        exit(0);
+        return;
     }
 
     for (int i=0; i < n; i++) {
@@ -156,20 +155,47 @@ void get_zero(double **A,int **pos_arr) {
         }
     }
     coeff_rank = i_cur;
+    //单独处理欠定方程组的情况
+    if (n < m) {
+        int *flag = calloc(m-1,sizeof(int));
+        if (flag == NULL) {
+            printf("内存分配失败！");
+            system("pause");
+            exit(1);
+        }
+        //找到主元的位置从而确定基础解系的列
+        for (int i=0; i < n; i++) {
+            for (int j=0; j < m - 1; j++) {
+                if (is_equal(A[i][j],1.0)) {
+                    flag[j] = 1;
+                    break;
+                }
+            }
+        }
+        for (int i=0,temp=0,row=0; i < m - 1; i++) {
+            if (flag[i] == 0) {
+                pos_arr[temp][0] = row;
+                pos_arr[temp][1] = i;
+                temp++;
+            }
+            else row++;
+        }
+        free(flag);
+    }
 }
 //根据坐标，得基础解系向量vec具体的值；注意坐标的i必然是不减的
 void vec_solve(double **A,double **vec,int **pos_arr,int num) {
     //index 既对应解系向量，又对应pos_arr
     for (int index=0; index < num; index++) {
         int temp = 0;
-        for (int p_in=0, p_read=0; p_in < n; p_in++) {
+        for (int p_in=0, p_read=0; p_in < m - 1; p_in++) {
             if (p_in == pos_arr[index][0]) {
                 vec[index][p_in] = 1;
                 for (int j=index+1; j < num; j++) pos_arr[j][0]++;
                 break;
             }
 
-            if (p_read == pos_arr[temp][0]) {
+            if (p_in == pos_arr[temp][0]) {
                 temp++;
                 vec[index][p_in] = 0;
             }
@@ -230,14 +256,14 @@ void gaussian_solve(double **A,int **pos_arr) {
 
         //列不满秩，解的形式为特解+对应齐次基础解系
         //解决t特解向量
-        double *spec_vec = calloc(n,sizeof(double));
+        double *spec_vec = calloc(m-1,sizeof(double));
         if (spec_vec == NULL) {
             printf("\n内存分配失败！\n");
             system("pause");
             exit(0);
         }
-        for (int p_in=0,temp=0,p_read; p_in < n; p_in++) {
-            if (p_in == pos_arr[temp][0] + temp) {
+        for (int p_in=0,temp=0,p_read=0; p_in < m - 1; p_in++) {
+            if (temp < solutions_num && p_in == pos_arr[temp][0] + temp) {
                 temp++;
                 spec_vec[p_in] = 0;
             }
@@ -253,8 +279,8 @@ void gaussian_solve(double **A,int **pos_arr) {
         //输出
         printf("\n为该方程组通解为：\n");
         printf("(");
-        for (int j=0; j < n; j++) {
-            if (j != n - 1) printf("%lf, ",spec_vec[j]);
+        for (int j=0; j < m - 1; j++) {
+            if (j != m - 2) printf("%lf, ",spec_vec[j]);
             else printf("%lf)^T",spec_vec[j]);
         }
         printf(" +\n");
@@ -271,7 +297,8 @@ void gaussian_solve(double **A,int **pos_arr) {
 }
 
 int main() {
-    freopen("input.txt","r",stdin);
+    freopen("bad.txt","r",stdin);
+    //freopen("ok.txt","r",stdin);
     int temp;
     printf("本计算器适用于 1.求解线性方程组Ax = b 2.计算方阵的行列式 3.将矩阵化为行简化阶梯型并求矩阵的秩 \n此外，本计算器的精度为 0.0001 ，如果数值过小，结果可能是错误的！\n如果你已经知晓以上内容，请输入 1 ：");
     scanf("%d",&temp);
