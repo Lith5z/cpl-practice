@@ -44,6 +44,7 @@ void show(double **matrix);
 double** init_matrix(void);
 double** init_vec(int nums);
 void matrix_copy(double **org,double **dst);
+void free_matrix(void **A,int row);
 
 //det函数会破坏原矩阵，请带入副本
 double det(double **A) {
@@ -84,11 +85,11 @@ void cramer_solve(double **A,double *res) {
     double **tempA = init_matrix();
     matrix_copy(A,tempA);
     double detAb = det(tempA);
-    free(tempA);
     if (is_equal(detAb,0)) {
         printf("\n系数矩阵的行列式为0，克莱姆法则无法判断解的情况！\n");
         return;
     }
+    free_matrix((void**)tempA,n);
 
     for (int i=0; i < n; i++) {
         double **replaceA = init_matrix();
@@ -96,7 +97,7 @@ void cramer_solve(double **A,double *res) {
         replace_column(replaceA,i);
         res[i] = det(replaceA) / detAb;
         if (debug_mode) printf("\n第%d个未知数为%lf\n",i+1,res[i]);
-        free(replaceA);
+        free_matrix((void**)replaceA,n);
     }
 }
 //将增广矩阵化为行简化 同时维护增广矩阵的rank，会修改带入的矩阵
@@ -181,6 +182,7 @@ void get_zero(double **A,int **pos_arr) {
             else row++;
         }
         free(flag);
+        flag = NULL;
     }
 }
 //根据坐标，得基础解系向量vec具体的值；注意坐标的i必然是不减的
@@ -234,6 +236,7 @@ void gaussian_solve(double **A,int **pos_arr) {
             if (i != solutions_num - 1) printf(" +\n");
             else printf(".\n其中 k_i 为任意实数\n");
         }
+        free_matrix((void**)vecs,solutions_num);
     }
     else {
         //判断可解性
@@ -293,12 +296,13 @@ void gaussian_solve(double **A,int **pos_arr) {
             if (i != solutions_num - 1) printf(" +\n");
             else printf(".\n其中 k_i 为任意实数\n");
         }
+        free(spec_vec);
+        free_matrix((void**)vecs,solutions_num);
     }
 }
 
 int main() {
     freopen("bad.txt","r",stdin);
-    //freopen("ok.txt","r",stdin);
     int temp;
     printf("本计算器适用于 1.求解线性方程组Ax = b 2.计算方阵的行列式 3.将矩阵化为行简化阶梯型并求矩阵的秩 \n此外，本计算器的精度为 0.0001 ，如果数值过小，结果可能是错误的！\n如果你已经知晓以上内容，请输入 1 ：");
     scanf("%d",&temp);
@@ -376,7 +380,6 @@ int main() {
         case RANK_MODE: printf("\n请逐行输入矩阵：\n");break;
         default: {
             printf("\n这怎么可能？？\n");
-            free(matrix);
             system("pause");
             return 1;
         }
@@ -422,6 +425,7 @@ int main() {
                 }
             }
             gaussian_solve(matrix,zero_pos);
+            free_matrix((void**)zero_pos,n);
             break;
         }
         case DET_MODE: {
@@ -436,19 +440,24 @@ int main() {
         }
         default: {
             printf("\n这怎么可能？？\n");
-            free(matrix);
             system("pause");
             return 1;
         }
     }
 
-    //free(matrix);
+    free_matrix((void**)matrix,n);
     system("pause");
     return 0;
 }
 
 
-
+void free_matrix(void **A,int row) {
+    if (A == NULL) return;
+    for (int i=0; i < row; i++) {
+        free(A[i]);
+    }
+    free(A);
+}
 void show(double **matrix) {
     if (cal_mode == CRAMER_MODE || cal_mode == GAUSSIAN_MODE) printf("\n当前增广矩阵为\n");
     else printf("\n当前矩阵为\n");
