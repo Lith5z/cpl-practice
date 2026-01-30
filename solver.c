@@ -302,7 +302,6 @@ void gaussian_solve(double **A,int **pos_arr) {
 }
 
 int main() {
-    freopen("bad.txt","r",stdin);
     int temp;
     printf("本计算器适用于 1.求解线性方程组Ax = b 2.计算方阵的行列式 3.将矩阵化为行简化阶梯型并求矩阵的秩 \n此外，本计算器的精度为 0.0001 ，如果数值过小，结果可能是错误的！\n如果你已经知晓以上内容，请输入 1 ：");
     scanf("%d",&temp);
