@@ -1,24 +1,44 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define DELTA 0.001
+//for derivative
+#define DELTA 0.0001
+//exp: rate ~ 1 / (x_max * y_max)
+#define RATE 0.001
+#define LIMIT 0.001
 
 int num,steps;
 double *x_data,*y_data;
 
 //sum of the squares of the vertical (plumb) distances from points to the line
-double cost(double k,double b) {
+double total_cost(double k,double b) {
     double res = 0;
     for (int i=0; i < num; i++) {
         res += (y_data[i] - (k * x_data[i] + b)) * (y_data[i] - (k * x_data[i] + b));
     }
     return res;
 }
-double k_derivative(double (*func)(double,double),double k,double b) {
-    return (func(k + DELTA,b) - func(k,b)) / DELTA;
+double single_cost(double k,double b,int index) {
+    return (y_data[index] - (k * x_data[index] + b)) * (y_data[index] - (k * x_data[index] + b));
 }
-double b_derivative(double (*func)(double,double),double k,double b) {
-    return (func(k,b + DELTA) - func(k,b)) / DELTA;
+double k_derivative(double (*func)(double,double,int),double k,double b) {
+    double res = 0;
+    for (int i=0; i < num; i++) {
+        double tmp = (single_cost(k+DELTA,b,i) - single_cost(k,b,i)) / DELTA;
+        res += tmp;
+    }
+    return res;
+}
+double b_derivative(double (*func)(double,double,int),double k,double b) {
+    double res = 0;
+    for (int i=0; i < num; i++) {
+        double tmp = (single_cost(k,b+DELTA,i) - single_cost(k,b,i)) / DELTA;
+        res += tmp;
+    }
+    return res;
+}
+double diff_acc(double accurate,double res) {
+    return (res - accurate) / accurate * 100;
 }
 
 int main() {
@@ -39,7 +59,28 @@ int main() {
     double k = (y_data[1] - y_data[0]) / (x_data[1] - x_data[0]);
     double b = y_data[0] - k * x_data[0];
 
-    printf("d(cost) / d(k):%lf\n",k_derivative(cost,k,b));
-    printf("d(cost) / d(b):%lf\n",b_derivative(cost,k,b));
+    for (int i=1; i <= steps; i++) {
+        printf("Steps:%d...\n",i);
+        double k_d = k_derivative(single_cost,k,b);
+        double b_d = b_derivative(single_cost,k,b);
+        printf("d(cost) / d(k):%lf\n",k_d);
+        printf("d(cost) / d(b):%lf\n",b_d);
+        k -= k_d * RATE;
+        b -= b_d * RATE;
+        double avg_cost = total_cost(k,b);
+        printf("Total Cost:%lf\n",avg_cost);
+        printf("\n");
+
+        avg_cost /= num;
+        if (-LIMIT < k_d && k_d < LIMIT || -LIMIT < b_d && b_d < LIMIT) {
+            printf("\nReach the limit:%.3lf at step:%d\n",LIMIT,i);
+            break;
+        }
+    }
+
+    printf("The standard result: y=%.3lfx%+.3lf\n",k_standard,b_standard);
+    printf("Gradient descent sesult: y=%.3lfx%+.3lf\n",k,b);
+    printf("Diff:%.2lf%%\n",(diff_acc(k_standard,k) + diff_acc(b_standard,b)) / 2);
+
     return 0;
 }
