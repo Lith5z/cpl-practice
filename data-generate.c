@@ -23,7 +23,8 @@ int main() {
         x[i] = rand() / 3276.7;
         printf("%.3lf",x[i]);
         srand((unsigned int)rand());
-        y[i] = x[i] * k + b + rand() / 37267.0;
+        //bias : 0 - 10
+        y[i] = x[i] * k + b + rand() / 3276;
         printf(" %.3lf\n",y[i]);
         srand((unsigned int)rand());
     }
