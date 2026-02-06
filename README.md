@@ -22,19 +22,18 @@
 
 (bug: 监视模式对高斯消元法不生效。因为高斯消元法情况太多，估计不打算解决了)
 
-### linear-regression.c 基于优化方法的线性回归
+### linear-regression.c 类梯度下降的线性回归
 
-data-generate.c用于生成一组带有偏差的线性数据，到output.txt
+data-generate.c利用标准库的rand函数用于生成一组带有偏差的线性数据，到output.txt
 
 同时生成最小二乘法计算的回归结果作为参考
 
-（利用标准库rand函数）（默认为10个）
+linear-regression.c从output.txt中读取数据，使用类似梯度下降的方法来计算斜率截距
 
-linear-regression.c从这个文本中读取数据，使用类似梯度下降法来计算斜率截距
+最初版本用的是整体梯度下降，收敛速度很慢，在合适的学习率设置下，大概需要1.5k-2k steps才能得到误差在0.001%的结果
+后来换用随机梯度下降法，设置好batch_size，基本能控制在1.3k steps；特别是大样本的情况，偶尔只需要三位数steps（小样本效果不如整体梯度）
 
-目前收敛速度极慢，大概需要2k才能得到误差在0.01%的结果
-
-（可以自行设置steps）（学习率等参数需要修改宏定义）
+（rate,steps,batch_size这些参数需要自行修改，否则很可能不收敛）
 
 # To Do
 

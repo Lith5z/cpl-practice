@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define NUM 10
+#define NUM 1000
 //NUM should >= 3
 
 int main() {
